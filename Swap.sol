@@ -1,6 +1,7 @@
 pragma solidity ^0.4.13;
 
 import "github.com/oraclize/ethereum-api/oraclizeAPI.sol";
+import "https://github.com/DecentralizedDerivatives/Deriveth/Sf.sol";
 
 contract Swap is usingOraclize{
   enum SwapState {created,open,started,ready,over,ended}
