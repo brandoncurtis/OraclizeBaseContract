@@ -1,1 +1,1 @@
-# OraclizeMasterContract
+# OraclizeBaseContract
