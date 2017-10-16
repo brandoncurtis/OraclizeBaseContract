@@ -3,7 +3,7 @@ pragma solidity ^0.4.13;
 import "github.com/oraclize/ethereum-api/oraclizeAPI.sol";
 import "https://github.com/DecentralizedDerivatives/Deriveth/Sf.sol";
 
-contract Swap is usingOraclize{
+ontract Swap is usingOraclize{
   enum SwapState {created,open,started,ready,over,ended}
   SwapState public currentState;
   address public long_party;
@@ -23,7 +23,8 @@ contract Swap is usingOraclize{
   uint public share_short;
   uint256 public s_premium; //short premium (bonus to short side in wei, input in finney (1/1000 of ether))
   uint256 public l_premium; //long premium (bonus to long side in wei, input in finney (1/1000 of ether))
-  bool o_id;
+  bytes32 sId;
+  bytes32 eId;
   bool long;
   uint obal;
   address party;
@@ -37,53 +38,51 @@ modifier onlyState(SwapState expectedState) {require(expectedState == currentSta
   }
 
  
-  function CreateSwap(string _url, uint _duration, uint _margin, uint _margin2, uint _notional, bool _long, uint _l_premium, uint _s_premium) payable {
+  function CreateSwap(string _url, uint _duration, uint _lmargin, uint _smargin, uint _notional, bool _long, uint _l_premium, uint _s_premium) payable {
       require (msg.sender == party);
       url = _url;
-      notional = Sf.mul(_notional,1000000000000000000);
-      l_premium = Sf.mul(_l_premium,1000000000000000);
-      s_premium = Sf.mul(_s_premium,1000000000000000);
+      notional = Sf.mul(_notional,1e18);
+      l_premium = Sf.mul(_l_premium,1e15);
+      s_premium = Sf.mul(_s_premium,1e15);
       long = _long;
       duration = _duration;
-      o_id = true;
+      lmargin = Sf.mul(_lmargin,1e18);
+      smargin = Sf.mul(_smargin,1e18);
       if (long){long_party = msg.sender;
-        require(msg.value == Sf.add(l_premium,Sf.mul(_margin,1000000000000000000)));
-        lmargin = Sf.mul(_margin,1000000000000000000);
-        smargin = Sf.mul(_margin2,1000000000000000000);}
+        require(msg.value == Sf.add(l_premium,lmargin));
+      }
       else {short_party = msg.sender;
-        require(msg.value == Sf.add(s_premium,Sf.mul(_margin,1000000000000000000)));
-        smargin = Sf.mul(_margin,1000000000000000000);
-        lmargin = Sf.mul(_margin2,1000000000000000000);
+        require(msg.value == Sf.add(s_premium,smargin));
       }
       currentState = SwapState.open;
       Print ('Contract Balance',this.balance);
   }
 
-  function EnterSwap(string _url,uint _margin, uint _notional, bool _long, uint _duration, uint256 _l_premium, uint256 _s_premium) public onlyState(SwapState.open) payable {
-      require(sha3(_url) == sha3(url) && _long != long && notional == Sf.mul(_notional,1000000000000000000) && _duration == duration);
-      if (long) {short_party = msg.sender;
+  function EnterSwap(string _url,uint _lmargin,uint _smargin, uint _notional, bool _long, uint _duration, uint256 _l_premium, uint256 _s_premium) public onlyState(SwapState.open) payable {
+      require(sha3(_url) == sha3(url) && _long != long && notional == Sf.mul(_notional,1e18) && _duration == duration);
+      if (long) {
+      short_party = msg.sender;
       require(msg.value >= Sf.add(s_premium,smargin));
-      require(Sf.add(lmargin,l_premium) >= Sf.add(Sf.mul(_l_premium,1000000000000000),Sf.mul(_margin,1000000000000000000)));
+      require(Sf.add(lmargin,l_premium) >= Sf.add(Sf.mul(_l_premium,1e15),Sf.mul(_lmargin,1e18)));
       }
       else {long_party = msg.sender;
       require(msg.value >=Sf.add(l_premium,lmargin));
-      require(Sf.add(smargin,s_premium) >= Sf.add(Sf.mul(_s_premium,1000000000000000),Sf.mul(_margin,1000000000000000000)));
+      require(Sf.add(smargin,s_premium) >= Sf.add(Sf.mul(_s_premium,1e15),Sf.mul(_smargin,1e18)));
       }
       obal = Sf.sub(this.balance,Sf.add(l_premium,s_premium));
       Print ('Contract Balance',this.balance);
-      oraclize_query("URL",url);
-      oraclize_query(duration,"URL",url);
+      sId = oraclize_query("URL",url);
+      eId = oraclize_query(duration,"URL",url);
       currentState = SwapState.started;
       Print ('Contract Balance',this.balance);
   }
 
     function __callback(bytes32 _oraclizeID, string _result) {
       require(msg.sender == oraclize_cbAddress());
-      if (o_id){
+      if (_oraclizeID == sId){
         startValue = parseInt(_result,3);
-        o_id = false;
       }
-      else{
+      else if (_oraclizeID == eId){
         endValue = parseInt(_result,3);
         currentState = SwapState.ready;
       }
@@ -146,7 +145,7 @@ modifier onlyState(SwapState expectedState) {require(expectedState == currentSta
         notional = 0;
         long = false;
         duration = 0;
-        o_id = true;
+        sId = 0;
         url = '';
         short_party = 0;
         long_party = 0;
@@ -158,7 +157,7 @@ modifier onlyState(SwapState expectedState) {require(expectedState == currentSta
 
   else{
     if (msg.sender == long_party && paid_long == false){cancel_long = true;}
-    if (msg.sender == short_party && paid_short == false){cancel_short = true;}
+    else if (msg.sender == short_party && paid_short == false){cancel_short = true;}
     if (cancel_long && cancel_short){
         uint adj_bal = Sf.sub(this.balance,Sf.add(l_premium,s_premium));
         smargin = Sf.div(Sf.mul(adj_bal,smargin),(notional));
@@ -168,5 +167,4 @@ modifier onlyState(SwapState expectedState) {require(expectedState == currentSta
       }
     }
   }
-  
 }
