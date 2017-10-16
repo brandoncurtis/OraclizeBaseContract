@@ -12,7 +12,7 @@ contract Factory {
 
     function Factory (){
         creator = msg.sender; 
-        fee = 10000000000000000; 
+        fee = 10e15; 
     }
 
     function createContract () payable returns (address){
@@ -24,11 +24,5 @@ contract Factory {
     } 
     function withdrawFee() onlyOwner {
         creator.transfer(this.balance);
-    }
-
-        /*ie .01 ether = 1000 */
-    function setFee(uint _fee) onlyOwner{
-      fee = Sf.mul(_fee,10000000000000);
-      FeeChange(fee);
     }
 }
